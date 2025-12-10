@@ -3,454 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบค้นหา Work Sheet</title>
+    <title>เครื่องมือตรวจซ่อม API</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
-    
-    <style>
-        body { font-family: 'Prompt', sans-serif; }
-        
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        }
-
-        .list-item-row { transition: all 0.2s ease-in-out; }
-        .list-item-row:hover {
-            transform: translateX(4px);
-            border-left-color: #2563EB;
-            background-color: #F8FAFC;
-        }
-
-        .toggle-checkbox:checked { right: 0; border-color: #2563EB; }
-        .toggle-checkbox:checked + .toggle-label { background-color: #2563EB; }
-        
-        /* Lock Screen Animation */
-        .fade-out { opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
-    </style>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+    <style> body { font-family: 'Sarabun', sans-serif; } </style>
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] flex flex-col overflow-hidden">
+<body class="bg-gray-100 p-4">
 
-    <!-- 🔒 LOGIN OVERLAY (Gatekeeper) -->
-    <div id="loginOverlay" class="fixed inset-0 z-[100] bg-slate-900/95 flex flex-col items-center justify-center text-white transition-opacity duration-500 backdrop-blur-sm">
-        <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop')] bg-cover bg-center opacity-10"></div>
-        
-        <div class="relative z-10 text-center p-8 max-w-md w-full">
-            <div class="bg-white/10 backdrop-blur-md p-8 rounded-3xl border border-white/20 shadow-2xl">
-                <div class="mb-6 bg-blue-600 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-blue-600/30">
-                    <i class="fa-solid fa-folder-tree text-4xl text-white"></i>
-                </div>
-                
-                <h1 class="text-2xl font-bold mb-2">ระบบค้นหา Work Sheet</h1>
-                <p class="text-gray-300 mb-8 text-sm">สำนักมาตรฐานการทะเบียนที่ดิน</p>
-
-                <!-- Status Message -->
-                <div id="loginStatus" class="hidden mb-4 p-3 rounded-lg text-sm bg-red-500/20 text-red-200 border border-red-500/50"></div>
-
-                <button id="loginBtn" class="w-full bg-white text-slate-900 font-bold py-3.5 rounded-xl hover:bg-blue-50 transition-all flex items-center justify-center shadow-lg group disabled:opacity-50 disabled:cursor-not-allowed">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" class="w-5 h-5 mr-3 group-hover:scale-110 transition-transform">
-                    เข้าสู่ระบบด้วย Google
-                </button>
-                
-                <p class="mt-6 text-xs text-gray-500">
-                    ระบบจำกัดสิทธิ์เฉพาะเจ้าหน้าที่ที่ได้รับอนุญาต<br>
-                    (Authorized Personnel Only)
-                </p>
-            </div>
+    <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+        <div class="bg-blue-600 p-4 text-white">
+            <h1 class="text-xl font-bold">🚑 เครื่องมือตรวจซ่อม (Diagnostics)</h1>
+            <p class="text-sm opacity-80">ใช้สำหรับหาสาเหตุ Error</p>
         </div>
-    </div>
 
-    <!-- 🔓 MAIN APP -->
-    <div id="mainApp" class="flex flex-col min-h-screen w-full filter blur-sm transition-all duration-500">
-        
-        <!-- Navbar -->
-        <nav class="bg-white/90 backdrop-blur shadow-sm sticky top-0 z-50 border-b border-gray-100">
-            <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <div class="flex items-center">
-                        <div class="bg-gradient-to-tr from-blue-600 to-indigo-600 text-white w-10 h-10 rounded-lg flex items-center justify-center mr-3 shadow-lg shadow-blue-500/30">
-                            <i class="fa-solid fa-cloud-magnifying-glass"></i>
-                        </div>
-                        <div>
-                            <h1 class="text-xl font-bold text-gray-800 tracking-tight">ระบบค้นหา Work Sheet</h1>
-                            <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wider">สำนักมาตรฐานการทะเบียนที่ดิน</p>
-                        </div>
-                    </div>
-
-                    <!-- User Profile -->
-                    <div class="flex items-center space-x-3">
-                        <div class="text-right hidden sm:block">
-                            <div id="userEmailDisplay" class="text-sm font-semibold text-gray-700">Checking...</div>
-                            <div class="text-xs text-green-500"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Authorized</div>
-                        </div>
-                        <div class="h-10 w-10 rounded-full bg-gray-200 border-2 border-white shadow-sm overflow-hidden relative">
-                            <img id="userAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Admin" alt="User">
-                        </div>
-                        <button onclick="handleSignOut()" class="text-gray-400 hover:text-red-500 ml-2" title="ออกจากระบบ">
-                            <i class="fa-solid fa-right-from-bracket"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </nav>
-
-        <!-- Main Content -->
-        <main class="max-w-5xl mx-auto px-4 py-10 w-full flex-grow pb-24">
+        <div class="p-6 space-y-4">
             
-            <!-- Search Panel -->
-            <div class="bg-white rounded-3xl shadow-xl p-8 mb-8 glass-panel">
-                <div class="relative max-w-2xl mx-auto group">
-                    <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                        <i class="fa-solid fa-magnifying-glass text-gray-400 text-lg group-focus-within:text-blue-500 transition-colors"></i>
-                    </div>
-                    <input type="text" id="searchInput" 
-                        class="block w-full pl-12 pr-32 py-4 bg-gray-50 border border-gray-200 rounded-xl text-lg placeholder-gray-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all" 
-                        placeholder="พิมพ์คำค้นหา">
-                    
-                    <button id="searchBtn" class="absolute right-2 top-2 bottom-2 bg-blue-600 hover:bg-blue-700 text-white px-6 rounded-lg font-medium transition-all shadow-md shadow-blue-500/20 active:scale-95">
-                        ค้นหา
-                    </button>
-                </div>
-
-                <div class="mt-5 flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <div class="flex items-center bg-gray-50 px-4 py-2 rounded-full border border-gray-100 hover:border-gray-200 transition-colors">
-                        <span class="text-xs font-bold text-gray-400 uppercase mr-3">Mode:</span>
-                        <div class="relative inline-block w-10 mr-2 align-middle select-none">
-                            <input type="checkbox" id="fullTextToggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 transition-all duration-300 top-0.5 left-0.5 shadow-sm"/>
-                            <label for="fullTextToggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-200 cursor-pointer"></label>
-                        </div>
-                        <label for="fullTextToggle" class="cursor-pointer select-none">
-                            <span id="modeLabel" class="text-sm font-medium text-gray-600 transition-colors">ค้นหาจากชื่อไฟล์</span>
-                        </label>
-                    </div>
-
-                    <!-- Folder Status Indicator -->
-                    <div id="folderStatus" class="hidden text-xs text-blue-500 bg-blue-50 px-3 py-1 rounded-full border border-blue-100 flex items-center">
-                        <i class="fa-solid fa-folder-tree mr-1.5"></i>
-                        ค้นหาในโฟลเดอร์ที่กำหนด
-                    </div>
-                </div>
+            <!-- Step 1: Config Check -->
+            <div class="border-b pb-4">
+                <h3 class="font-bold text-gray-700 mb-2">1. ตรวจสอบค่าตั้งต้น</h3>
+                <div id="configStatus" class="text-sm text-gray-500">กำลังรอ...</div>
             </div>
 
-            <!-- Results Section -->
-            <div id="resultsArea" class="hidden animate-fade-in-up">
-                <div class="flex items-center justify-between mb-4 px-2">
-                    <h3 class="text-sm font-bold text-gray-700 flex items-center">
-                        <span class="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></span>
-                        ผลการค้นหา
-                    </h3>
-                </div>
-
-                <div class="hidden md:flex items-center px-4 py-2 text-xs font-semibold text-gray-400 border-b border-gray-200 mb-2 select-none">
-                    <div class="flex-grow pl-14">ชื่อเอกสาร</div>
-                    <div class="w-32 text-right">แก้ไขล่าสุด</div>
-                    <div class="w-24 text-right">ขนาดไฟล์</div>
-                    <div class="w-8"></div>
-                </div>
-
-                <div id="loading" class="hidden py-12 text-center text-gray-400">
-                    <div class="inline-block animate-spin w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full mb-2"></div>
-                    <p class="text-xs">กำลังติดต่อ Google Drive...</p>
-                </div>
-
-                <div id="fileList" class="space-y-2 pb-6 min-h-[100px]"></div>
-
-                <!-- API Pagination Controls -->
-                <div id="paginationControls" class="flex flex-wrap justify-center items-center gap-2 pt-6 border-t border-gray-200 mt-4 select-none">
-                    <button id="firstPageBtn" class="px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm">
-                        <i class="fa-solid fa-angles-left mr-1"></i> หน้าแรก
-                    </button>
-                    
-                    <button id="prevPageBtn" class="px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm">
-                        <i class="fa-solid fa-chevron-left mr-1"></i> ก่อนหน้า
-                    </button>
-                    
-                    <div class="flex items-center mx-3">
-                        <span class="text-xs text-gray-400 font-medium mr-2">หน้า</span>
-                        <span id="pageDisplay" class="text-sm font-bold text-gray-700 bg-white border px-3 py-1 rounded">1</span>
-                    </div>
-                    
-                    <button id="nextPageBtn" class="px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-blue-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm">
-                        ถัดไป <i class="fa-solid fa-chevron-right ml-1"></i>
-                    </button>
-                </div>
-                <p class="text-center text-[10px] text-gray-400 mt-2">* เนื่องจากข้อจำกัดของ API จึงไม่สามารถระบุหน้าสุดท้ายได้</p>
+            <!-- Step 2: Auth -->
+            <div class="border-b pb-4">
+                <h3 class="font-bold text-gray-700 mb-2">2. ทดสอบล็อกอิน</h3>
+                <button id="authBtn" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 w-full mb-2">
+                    กดเพื่อล็อกอิน (Authorize)
+                </button>
+                <div id="authStatus" class="text-sm p-2 bg-gray-50 rounded hidden"></div>
             </div>
-        </main>
+
+            <!-- Step 3: API Call -->
+            <div>
+                <h3 class="font-bold text-gray-700 mb-2">3. ทดสอบดึงข้อมูล (API)</h3>
+                <button id="apiBtn" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 w-full mb-2" disabled>
+                    กดเพื่อดึงไฟล์ 1 ไฟล์
+                </button>
+                <!-- พื้นที่แสดง Error ของจริง -->
+                <div id="errorBox" class="text-xs font-mono p-3 bg-black text-red-400 rounded mt-2 hidden break-all"></div>
+                <div id="successBox" class="text-xs p-3 bg-green-50 text-green-700 rounded mt-2 hidden"></div>
+            </div>
+
+        </div>
     </div>
 
-    <!-- Footer (Fixed Bottom) -->
-    <footer class="bg-white/90 backdrop-blur border-t border-gray-200 fixed bottom-0 w-full z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <div class="max-w-6xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col md:flex-row justify-between items-center text-xs text-gray-500">
-                <div class="mb-1 md:mb-0 font-medium">
-                    &copy; <script>document.write(new Date().getFullYear())</script> All Rights Reserved.
-                </div>
-                <div class="flex items-center gap-2">
-                    <span><i class="fa-solid fa-code text-blue-500 mr-1"></i>Developed by:</span>
-                    <span class="font-bold text-gray-700">Phongsathorn Boonprasert</span>
-                </div>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Google Scripts -->
+    <!-- Scripts -->
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 
     <script>
-        // ================= CONFIGURATION =================
-        const CLIENT_ID = '395031237674-6j28i27or4lk6t3m342srbefukr1fp1d.apps.googleusercontent.com'; 
-        const API_KEY = 'AIzaSyANFH1JUJ8Y29ImxTYwBdSV6V7-xWfHd90';     
-        const TARGET_FOLDER_ID = '1Qc-SfLHgTcrFG12F39p87xjLNuTdt-HK'; // 🔒 Folder ID
-        
-        // 👥 รายชื่ออีเมลที่อนุญาตให้ใช้งาน (เพิ่มได้เรื่อยๆ โดยคั่นด้วยลูกน้ำ)
-        const ALLOWED_EMAILS = [
-            'boonprasertlawyer@gmail.com',
-            'phonga2730@gmail.com'
-        ];
-        // =============================================
+        // ==========================================
+        // ⚠️ ใส่รหัสของคุณตรงนี้อีกครั้งเพื่อความชัวร์ ⚠️
+        // ==========================================
+        const CLIENT_ID = '395031237674-6j28i27or4lk6t3m342srbefukr1fp1d.apps.googleusercontent.com';
+        const API_KEY = 'AIzaSyANFH1JUJ8Y29ImxTYwBdSV6V7-xWfHd90'; 
+        // ==========================================
 
-        // API State
         let tokenClient;
         let accessToken = null;
-        let pageTokenStack = [null]; 
-        let currentPage = 1;
-        
-        // DOM Elements
-        const loginOverlay = document.getElementById('loginOverlay');
-        const mainApp = document.getElementById('mainApp');
-        const loginBtn = document.getElementById('loginBtn');
-        const loginStatus = document.getElementById('loginStatus');
-        const folderStatus = document.getElementById('folderStatus');
-        
-        const searchBtn = document.getElementById('searchBtn');
-        const searchInput = document.getElementById('searchInput');
-        const resultsArea = document.getElementById('resultsArea');
-        const fileList = document.getElementById('fileList');
-        const loading = document.getElementById('loading');
-        const toggle = document.getElementById('fullTextToggle');
-        const modeLabel = document.getElementById('modeLabel');
-        
-        const firstPageBtn = document.getElementById('firstPageBtn');
-        const prevPageBtn = document.getElementById('prevPageBtn');
-        const nextPageBtn = document.getElementById('nextPageBtn');
-        const pageDisplay = document.getElementById('pageDisplay');
 
-        // Check if Folder Lock is active
-        if(TARGET_FOLDER_ID && TARGET_FOLDER_ID.length > 5) {
-            folderStatus.classList.remove('hidden');
+        // Helper to show logs
+        function log(elementId, msg, isError = false) {
+            const el = document.getElementById(elementId);
+            el.classList.remove('hidden');
+            el.innerHTML = msg; // Allow HTML
+            if(isError) el.classList.add('border', 'border-red-500');
         }
 
-        // --- 1. Init & Login Logic ---
-
-        function gapiLoaded() { gapi.load('client', initializeGapiClient); }
-        async function initializeGapiClient() {
-            if(!API_KEY || API_KEY.includes('YOUR_')) {
-                showLoginError('กรุณาใส่ API Key ในโค้ดก่อนใช้งาน');
-                return;
+        // 1. Check Config on Load
+        window.onload = () => {
+            const statusDiv = document.getElementById('configStatus');
+            if(CLIENT_ID.length < 10 || API_KEY.length < 10) {
+                statusDiv.innerHTML = '<span class="text-red-500">❌ ยังไม่ใส่ Client ID หรือ API Key</span>';
+            } else {
+                statusDiv.innerHTML = '<span class="text-green-600">✅ พบรหัส Config แล้ว</span>';
             }
-            await gapi.client.init({ 
-                apiKey: API_KEY, 
-                discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] 
+        };
+
+        // 2. Load Libraries
+        function gapiLoaded() {
+            gapi.load('client', async () => {
+                try {
+                    await gapi.client.init({
+                        apiKey: API_KEY,
+                        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+                    });
+                    console.log('GAPI Initialized');
+                } catch (err) {
+                    log('errorBox', '🔥 GAPI Init Error: ' + JSON.stringify(err), true);
+                }
             });
         }
 
         function gisLoaded() {
             tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID, 
-                scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
-                callback: handleTokenResponse,
+                client_id: CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/drive.readonly',
+                callback: (resp) => {
+                    if (resp.error) {
+                        log('authStatus', '❌ Auth Error: ' + JSON.stringify(resp), true);
+                        return;
+                    }
+                    accessToken = resp.access_token;
+                    log('authStatus', '✅ ล็อกอินสำเร็จ! (Token received)', false);
+                    document.getElementById('apiBtn').disabled = false;
+                    document.getElementById('authBtn').classList.add('opacity-50');
+                },
             });
-            loginBtn.onclick = () => tokenClient.requestAccessToken({prompt: 'consent'});
         }
 
-        async function handleTokenResponse(resp) {
-            if (resp.error) return;
-            accessToken = resp.access_token;
-            
-            // Verify User
-            loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังตรวจสอบสิทธิ์...';
-            try {
-                const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
-                });
-                const userData = await response.json();
-                
-                // 🔒 Security Check (Checking against Array)
-                if (ALLOWED_EMAILS.includes(userData.email)) {
-                    unlockApp(userData);
-                } else {
-                    lockApp(`อีเมล <strong>${userData.email}</strong> ไม่มีสิทธิ์เข้าใช้งาน`);
-                }
-            } catch (err) {
-                lockApp('เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์');
-            }
-        }
-
-        function unlockApp(user) {
-            document.getElementById('userEmailDisplay').textContent = user.email;
-            if(user.picture) document.getElementById('userAvatar').src = user.picture;
-            
-            loginOverlay.classList.add('fade-out');
-            setTimeout(() => { 
-                loginOverlay.style.display = 'none'; 
-                mainApp.classList.remove('blur-sm');
-                document.body.classList.remove('overflow-hidden');
-            }, 500);
-        }
-
-        function lockApp(msg) {
-            loginStatus.innerHTML = msg;
-            loginStatus.classList.remove('hidden');
-            loginBtn.innerHTML = 'เข้าสู่ระบบใหม่';
-            if(accessToken) google.accounts.oauth2.revoke(accessToken);
-            accessToken = null;
-        }
-
-        function handleSignOut() {
-            if(accessToken) google.accounts.oauth2.revoke(accessToken);
-            location.reload();
-        }
-
-        function showLoginError(msg) {
-            loginStatus.innerHTML = msg;
-            loginStatus.classList.remove('hidden');
-            loginBtn.disabled = true;
-        }
-
-        // --- 2. Search Logic (Real API) ---
-
-        toggle.addEventListener('change', (e) => {
-            if(e.target.checked) {
-                modeLabel.textContent = "ค้นหาเนื้อหา (Full-Text)";
-                modeLabel.className = "text-sm font-bold text-blue-600 transition-colors";
-            } else {
-                modeLabel.textContent = "ค้นหาจากชื่อไฟล์";
-                modeLabel.className = "text-sm font-medium text-gray-600 transition-colors";
-            }
-        });
-
-        searchBtn.onclick = () => performSearch(true);
-        searchInput.onkeypress = (e) => { if(e.key === 'Enter') performSearch(true) };
-
-        firstPageBtn.onclick = () => { pageTokenStack = [null]; currentPage = 1; performSearch(false); };
-        
-        prevPageBtn.onclick = () => { 
-            if(currentPage > 1) {
-                const targetToken = pageTokenStack[currentPage - 2];
-                pageTokenStack = pageTokenStack.slice(0, currentPage - 1);
-                currentPage--;
-                performSearch(false, targetToken);
-            }
-        };
-        
-        nextPageBtn.onclick = () => {
-             const nextToken = nextPageBtn.dataset.token;
-             if(nextToken) {
-                 currentPage++;
-                 pageTokenStack.push(nextToken);
-                 performSearch(false, nextToken);
-             }
+        document.getElementById('authBtn').onclick = () => {
+            if(!tokenClient) { alert('Google Library ยังโหลดไม่เสร็จ'); return; }
+            tokenClient.requestAccessToken({prompt: 'consent'});
         };
 
-        async function performSearch(isNewSearch, pageToken = null) {
-            const query = searchInput.value.trim();
-            if(!query && !isNewSearch) return;
-
-            if (isNewSearch) {
-                currentPage = 1;
-                pageTokenStack = [null];
-                pageToken = null;
-            }
-
-            resultsArea.classList.remove('hidden');
-            fileList.innerHTML = '';
-            loading.classList.remove('hidden');
+        // 3. Test API Call
+        document.getElementById('apiBtn').onclick = async () => {
+            const errBox = document.getElementById('errorBox');
+            const successBox = document.getElementById('successBox');
+            errBox.classList.add('hidden');
+            successBox.classList.add('hidden');
             
-            firstPageBtn.disabled = true;
-            prevPageBtn.disabled = true;
-            nextPageBtn.disabled = true;
+            successBox.textContent = 'กำลังทดสอบเชื่อมต่อ...';
+            successBox.classList.remove('hidden');
 
             try {
-                let q = "mimeType = 'application/pdf' and trashed = false";
-                
-                // Folder Restriction Logic
-                if (TARGET_FOLDER_ID && TARGET_FOLDER_ID.length > 5) {
-                    q += ` and '${TARGET_FOLDER_ID}' in parents`;
-                }
-
-                if(query) {
-                    if (toggle.checked) q += ` and fullText contains '${query}'`;
-                    else q += ` and name contains '${query}'`;
-                }
-
+                // Try to list just 1 file from anywhere (No folder restriction)
                 const response = await gapi.client.drive.files.list({
-                    'pageSize': 10,
-                    'fields': 'nextPageToken, files(id, name, webViewLink, thumbnailLink, createdTime, size)',
-                    'q': q,
-                    'pageToken': pageToken,
-                    'orderBy': 'createdTime desc'
+                    'pageSize': 1,
+                    'fields': 'files(id, name)',
                 });
 
                 const files = response.result.files;
-                const nextToken = response.result.nextPageToken;
+                successBox.innerHTML = `🎉 <strong>สำเร็จ!</strong> เชื่อมต่อได้แล้ว<br>พบไฟล์ตัวอย่าง: ${files.length > 0 ? files[0].name : 'ไม่พบไฟล์ (แต่เชื่อมต่อได้)'}`;
+                successBox.className = "text-xs p-3 bg-green-100 text-green-800 rounded mt-2 border border-green-200";
+
+            } catch (err) {
+                successBox.classList.add('hidden');
                 
-                loading.classList.add('hidden');
+                // 🕵️ แกะ Error ของจริงออกมาโชว์
+                console.error(err);
                 
-                if (files && files.length > 0) {
-                    files.forEach(file => fileList.appendChild(createFileCard(file)));
+                let errorMsg = "Unknown Error";
+                if (err.result && err.result.error) {
+                    errorMsg = `Code: ${err.result.error.code}<br>Message: ${err.result.error.message}`;
                     
-                    pageDisplay.textContent = currentPage;
-                    
-                    firstPageBtn.disabled = currentPage === 1;
-                    prevPageBtn.disabled = currentPage === 1;
-                    
-                    if(nextToken) {
-                        nextPageBtn.disabled = false;
-                        nextPageBtn.dataset.token = nextToken;
-                    } else {
-                        nextPageBtn.disabled = true;
+                    // แปลความหมาย Error ยอดฮิต
+                    if(err.result.error.code == 403) {
+                        errorMsg += `<br><br>👉 <strong>วิเคราะห์:</strong> สิทธิ์ถูกปฏิเสธ (ตรวจสอบ API Key Restrictions หรือไม่ได้เปิด Drive API)`;
+                    }
+                    if(err.result.error.message.includes('origin')) {
+                        errorMsg += `<br><br>👉 <strong>วิเคราะห์:</strong> URL เว็บไม่ตรงกับที่ลงทะเบียนไว้`;
                     }
                 } else {
-                    fileList.innerHTML = `<div class="text-center py-10 text-gray-400 bg-white border border-dashed rounded-lg"><i class="fa-regular fa-folder-open text-3xl mb-2"></i><p>ไม่พบข้อมูล</p></div>`;
+                    errorMsg = JSON.stringify(err);
                 }
-            } catch (err) {
-                loading.classList.add('hidden');
-                console.error(err);
-                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ Google Drive API');
-            }
-        }
 
-        function createFileCard(file) {
-            const div = document.createElement('div');
-            div.className = 'list-item-row group bg-white p-3 rounded-xl border border-transparent border-l-4 border-l-transparent hover:border-gray-200 hover:shadow-md cursor-pointer flex items-center justify-between gap-4 transition-all duration-200';
-            div.onclick = () => window.open(file.webViewLink, '_blank');
-            
-            const date = new Date(file.createdTime).toLocaleDateString('th-TH');
-            const size = file.size ? (file.size / (1024*1024)).toFixed(2) + ' MB' : '';
-            
-            div.innerHTML = `
-                <div class="flex items-center gap-4 flex-grow min-w-0">
-                    <div class="w-10 h-10 flex-shrink-0 bg-red-50 rounded-lg flex items-center justify-center text-red-500 text-xl shadow-sm group-hover:bg-red-100 transition-colors"><i class="fa-solid fa-file-pdf"></i></div>
-                    <div class="min-w-0 flex-grow">
-                        <div class="flex items-center"><h4 class="text-sm font-medium text-gray-700 truncate group-hover:text-blue-600 transition-colors" title="${file.name}">${file.name}</h4></div>
-                        <div class="md:hidden flex items-center text-xs text-gray-400 mt-1 space-x-2"><span>${date}</span><span>•</span><span>${size}</span></div>
-                    </div>
-                </div>
-                <div class="hidden md:flex items-center gap-6 text-sm text-gray-500 flex-shrink-0">
-                    <div class="w-32 text-right font-light text-xs">${date}</div>
-                    <div class="w-24 text-right"><span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-[10px] font-medium">${size}</span></div>
-                    <div class="w-8 text-right text-gray-300 group-hover:text-blue-500"><i class="fa-solid fa-chevron-right text-xs"></i></div>
-                </div>`;
-            return div;
-        }
+                log('errorBox', `🔥 <strong>API ERROR:</strong><br>${errorMsg}`, true);
+            }
+        };
     </script>
 </body>
 </html>
-
 
 
