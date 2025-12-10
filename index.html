@@ -3,85 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เครื่องมือซ่อม API</title>
+    <title>เครื่องมือตรวจซ่อม API (V2)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
     <style> body { font-family: 'Sarabun', sans-serif; } </style>
 </head>
 <body class="bg-gray-100 p-4">
 
     <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
-        <div class="bg-blue-600 p-4 text-white">
-            <h1 class="text-xl font-bold">🚑 เครื่องมือตรวจซ่อม (Diagnostics)</h1>
-            <p class="text-sm opacity-80">ใช้สำหรับหาสาเหตุ Error</p>
+        <div class="bg-purple-600 p-4 text-white">
+            <h1 class="text-xl font-bold">🕵️ Diagnostics Tool V2</h1>
+            <p class="text-sm opacity-80">เจาะลึกหา Error</p>
         </div>
 
         <div class="p-6 space-y-4">
             
-            <!-- Step 1: Config Check -->
             <div class="border-b pb-4">
-                <h3 class="font-bold text-gray-700 mb-2">1. ตรวจสอบค่าตั้งต้น</h3>
-                <div id="configStatus" class="text-sm text-gray-500">กำลังรอ...</div>
-            </div>
-
-            <!-- Step 2: Auth -->
-            <div class="border-b pb-4">
-                <h3 class="font-bold text-gray-700 mb-2">2. ทดสอบล็อกอิน</h3>
-                <button id="authBtn" class="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-700 w-full mb-2">
-                    กดเพื่อล็อกอิน (Authorize)
+                <h3 class="font-bold text-gray-700 mb-2">1. ยืนยันตัวตน (Auth)</h3>
+                <button id="authBtn" class="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 w-full mb-2">
+                    กดเพื่อล็อกอิน
                 </button>
                 <div id="authStatus" class="text-sm p-2 bg-gray-50 rounded hidden"></div>
             </div>
 
-            <!-- Step 3: API Call -->
             <div>
-                <h3 class="font-bold text-gray-700 mb-2">3. ทดสอบดึงข้อมูล (API)</h3>
-                <button id="apiBtn" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 w-full mb-2" disabled>
-                    กดเพื่อดึงไฟล์ 1 ไฟล์
+                <h3 class="font-bold text-gray-700 mb-2">2. ทดสอบดึงข้อมูล (API Call)</h3>
+                <button id="apiBtn" class="bg-gray-400 text-white px-4 py-2 rounded shadow w-full mb-2 cursor-not-allowed" disabled>
+                    รอการล็อกอิน...
                 </button>
-                <!-- พื้นที่แสดง Error ของจริง -->
-                <div id="errorBox" class="text-xs font-mono p-3 bg-black text-red-400 rounded mt-2 hidden break-all"></div>
-                <div id="successBox" class="text-xs p-3 bg-green-50 text-green-700 rounded mt-2 hidden"></div>
+                
+                <!-- พื้นที่แสดงผลลัพธ์ -->
+                <div id="resultArea" class="hidden mt-4">
+                    <p class="font-bold text-sm mb-1">ผลการตรวจสอบ:</p>
+                    <div id="logContent" class="text-xs font-mono p-3 bg-slate-900 text-green-400 rounded break-words whitespace-pre-wrap"></div>
+                </div>
             </div>
 
         </div>
     </div>
 
-    <!-- Scripts -->
     <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
     <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 
     <script>
-        // ==========================================
-        // ⚠️ ใส่รหัสของคุณตรงนี้อีกครั้งเพื่อความชัวร์ ⚠️
         // ==========================================
         const CLIENT_ID = '395031237674-6j28i27or4lk6t3m342srbefukr1fp1d.apps.googleusercontent.com';
         const API_KEY = 'AIzaSyANFH1JUJ8Y29ImxTYwBdSV6V7-xWfHd90'; 
         // ==========================================
 
         let tokenClient;
-        let accessToken = null;
 
-        // Helper to show logs
-        function log(elementId, msg, isError = false) {
-            const el = document.getElementById(elementId);
-            el.classList.remove('hidden');
-            el.innerHTML = msg; // Allow HTML
-            if(isError) el.classList.add('border', 'border-red-500');
+        function log(msg, isError = false) {
+            const area = document.getElementById('resultArea');
+            const content = document.getElementById('logContent');
+            area.classList.remove('hidden');
+            
+            // Format Error Object to String
+            if (typeof msg === 'object') {
+                if (msg.result && msg.result.error) {
+                    msg = `Google API Error:\nCode: ${msg.result.error.code}\nMessage: ${msg.result.error.message}\nDetails: ${JSON.stringify(msg.result.error.errors, null, 2)}`;
+                } else if (msg.message) {
+                    msg = `JS Error: ${msg.message}`;
+                } else {
+                    msg = JSON.stringify(msg, null, 2);
+                }
+            }
+
+            content.innerHTML = msg;
+            content.className = isError ? "text-xs font-mono p-3 bg-slate-900 text-red-400 rounded break-words whitespace-pre-wrap" : "text-xs font-mono p-3 bg-slate-900 text-green-400 rounded break-words whitespace-pre-wrap";
         }
 
-        // 1. Check Config on Load
-        window.onload = () => {
-            const statusDiv = document.getElementById('configStatus');
-            if(CLIENT_ID.length < 10 || API_KEY.length < 10) {
-                statusDiv.innerHTML = '<span class="text-red-500">❌ ยังไม่ใส่ Client ID หรือ API Key</span>';
-            } else {
-                statusDiv.innerHTML = '<span class="text-green-600">✅ พบรหัส Config แล้ว</span>';
-            }
-        };
-
-        // 2. Load Libraries
         function gapiLoaded() {
             gapi.load('client', async () => {
                 try {
@@ -89,9 +80,8 @@
                         apiKey: API_KEY,
                         discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
                     });
-                    console.log('GAPI Initialized');
                 } catch (err) {
-                    log('errorBox', '🔥 GAPI Init Error: ' + JSON.stringify(err), true);
+                    log(err, true);
                 }
             });
         }
@@ -102,70 +92,39 @@
                 scope: 'https://www.googleapis.com/auth/drive.readonly',
                 callback: (resp) => {
                     if (resp.error) {
-                        log('authStatus', '❌ Auth Error: ' + JSON.stringify(resp), true);
+                        log(resp, true);
                         return;
                     }
-                    accessToken = resp.access_token;
-                    log('authStatus', '✅ ล็อกอินสำเร็จ! (Token received)', false);
-                    document.getElementById('apiBtn').disabled = false;
-                    document.getElementById('authBtn').classList.add('opacity-50');
+                    document.getElementById('authStatus').textContent = '✅ ล็อกอินสำเร็จ (Access Token ได้รับแล้ว)';
+                    document.getElementById('authStatus').classList.remove('hidden');
+                    
+                    const btn = document.getElementById('apiBtn');
+                    btn.disabled = false;
+                    btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                    btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                    btn.textContent = 'กดเพื่อดึงไฟล์ 1 ไฟล์';
                 },
             });
         }
 
-        document.getElementById('authBtn').onclick = () => {
-            if(!tokenClient) { alert('Google Library ยังโหลดไม่เสร็จ'); return; }
-            tokenClient.requestAccessToken({prompt: 'consent'});
-        };
+        document.getElementById('authBtn').onclick = () => tokenClient.requestAccessToken({prompt: 'consent'});
 
-        // 3. Test API Call
         document.getElementById('apiBtn').onclick = async () => {
-            const errBox = document.getElementById('errorBox');
-            const successBox = document.getElementById('successBox');
-            errBox.classList.add('hidden');
-            successBox.classList.add('hidden');
-            
-            successBox.textContent = 'กำลังทดสอบเชื่อมต่อ...';
-            successBox.classList.remove('hidden');
-
+            log('กำลังส่งคำขอไปยัง Google Drive...');
             try {
-                // Try to list just 1 file from anywhere (No folder restriction)
                 const response = await gapi.client.drive.files.list({
                     'pageSize': 1,
                     'fields': 'files(id, name)',
                 });
-
-                const files = response.result.files;
-                successBox.innerHTML = `🎉 <strong>สำเร็จ!</strong> เชื่อมต่อได้แล้ว<br>พบไฟล์ตัวอย่าง: ${files.length > 0 ? files[0].name : 'ไม่พบไฟล์ (แต่เชื่อมต่อได้)'}`;
-                successBox.className = "text-xs p-3 bg-green-100 text-green-800 rounded mt-2 border border-green-200";
-
+                log(`🎉 สำเร็จ! พบไฟล์: ${response.result.files.length} รายการ\nตัวอย่าง: ${response.result.files[0]?.name || 'ไม่มีไฟล์'}`);
             } catch (err) {
-                successBox.classList.add('hidden');
-                
-                // 🕵️ แกะ Error ของจริงออกมาโชว์
-                console.error(err);
-                
-                let errorMsg = "Unknown Error";
-                if (err.result && err.result.error) {
-                    errorMsg = `Code: ${err.result.error.code}<br>Message: ${err.result.error.message}`;
-                    
-                    // แปลความหมาย Error ยอดฮิต
-                    if(err.result.error.code == 403) {
-                        errorMsg += `<br><br>👉 <strong>วิเคราะห์:</strong> สิทธิ์ถูกปฏิเสธ (ตรวจสอบ API Key Restrictions หรือไม่ได้เปิด Drive API)`;
-                    }
-                    if(err.result.error.message.includes('origin')) {
-                        errorMsg += `<br><br>👉 <strong>วิเคราะห์:</strong> URL เว็บไม่ตรงกับที่ลงทะเบียนไว้`;
-                    }
-                } else {
-                    errorMsg = JSON.stringify(err);
-                }
-
-                log('errorBox', `🔥 <strong>API ERROR:</strong><br>${errorMsg}`, true);
+                // ตัวงัดแงะ Error อยู่ตรงนี้
+                console.error("Full Error Object:", err); 
+                log(err, true);
             }
         };
     </script>
 </body>
 </html>
-
 
 
