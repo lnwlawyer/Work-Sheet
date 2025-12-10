@@ -40,7 +40,6 @@
                     <span id="btnText">⏳ กำลังโหลดระบบ...</span>
                 </button>
                 
-                <!-- Manual Reload -->
                 <div id="manualLoad" class="hidden mt-4">
                     <p class="text-xs text-yellow-400 mb-2">ระบบโหลดนานผิดปกติ?</p>
                     <button onclick="location.reload()" class="text-xs border border-white/30 px-3 py-1 rounded hover:bg-white/10">กดรีเฟรชหน้าจอ</button>
@@ -103,7 +102,11 @@
 
             <div id="resultsArea" class="hidden animate-fade-in-up">
                 <div class="flex items-center justify-between mb-4 px-2">
-                    <h3 class="text-sm font-bold text-gray-700 flex items-center"><span class="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></span>ผลการค้นหา</h3>
+                    <h3 class="text-sm font-bold text-gray-700 flex items-center">
+                        <span class="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2"></span>
+                        ผลการค้นหา
+                    </h3>
+                    <span id="resultCount" class="text-xs font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100 shadow-sm">0 รายการ</span>
                 </div>
                 <div class="hidden md:flex items-center px-4 py-2 text-xs font-semibold text-gray-400 border-b border-gray-200 mb-2 select-none">
                     <div class="flex-grow pl-14">ชื่อเอกสาร</div>
@@ -133,7 +136,6 @@
         </div>
     </footer>
 
-    <!-- Google Scripts -->
     <script src="https://apis.google.com/js/api.js" async defer></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
@@ -155,33 +157,21 @@
         let gapiReady = false;
         let gisReady = false;
 
-        // UI Refs
         const loginBtn = document.getElementById('loginBtn');
         const btnText = document.getElementById('btnText');
         const loginOverlay = document.getElementById('loginOverlay');
         const mainApp = document.getElementById('mainApp');
         
-        // Show manual reload if stuck
         setTimeout(() => {
             if (!gapiReady || !gisReady) {
                 document.getElementById('manualLoad').classList.remove('hidden');
             }
         }, 5000);
 
-        // --- ROBUST LOADER SYSTEM ---
         const checkInterval = setInterval(() => {
-            if(!gapiReady && typeof gapi !== 'undefined') {
-                gapiReady = true;
-                initGapi();
-            }
-            if(!gisReady && typeof google !== 'undefined' && google.accounts) {
-                gisReady = true;
-                initGis();
-            }
-            if(gapiReady && gisReady) {
-                clearInterval(checkInterval);
-                enableLoginUI();
-            }
+            if(!gapiReady && typeof gapi !== 'undefined') { gapiReady = true; initGapi(); }
+            if(!gisReady && typeof google !== 'undefined' && google.accounts) { gisReady = true; initGis(); }
+            if(gapiReady && gisReady) { clearInterval(checkInterval); enableLoginUI(); }
         }, 500);
 
         function enableLoginUI() {
@@ -194,14 +184,9 @@
         function initGapi() {
             gapi.load('client', async () => {
                 try {
-                    await gapi.client.init({
-                        apiKey: API_KEY,
-                        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
-                    });
+                    await gapi.client.init({ apiKey: API_KEY, discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
                     await gapi.client.load('drive', 'v3');
-                } catch (err) {
-                    console.error("GAPI Init Error:", err);
-                }
+                } catch (err) { console.error("GAPI Init Error:", err); }
             });
         }
 
@@ -212,63 +197,43 @@
                     scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
                     callback: handleTokenResponse,
                 });
-            } catch (err) {
-                console.error("GIS Init Error:", err);
-            }
+            } catch (err) { console.error("GIS Init Error:", err); }
         }
 
-        loginBtn.onclick = () => {
-            if(!tokenClient) return;
-            tokenClient.requestAccessToken({prompt: 'consent'});
-        };
+        loginBtn.onclick = () => { if(tokenClient) tokenClient.requestAccessToken({prompt: 'consent'}); };
 
         async function handleTokenResponse(resp) {
             if (resp.error) return;
             accessToken = resp.access_token;
-            
             btnText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังตรวจสอบสิทธิ์...';
             try {
-                const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
-                });
+                const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { 'Authorization': `Bearer ${accessToken}` } });
                 const user = await response.json();
-                
-                if (ALLOWED_EMAILS.includes(user.email)) {
-                    unlockApp(user);
-                } else {
+                if (ALLOWED_EMAILS.includes(user.email)) { unlockApp(user); }
+                else {
                     document.getElementById('loginStatus').innerHTML = `อีเมล <strong>${user.email}</strong> ไม่มีสิทธิ์เข้าใช้งาน`;
                     document.getElementById('loginStatus').classList.remove('hidden');
                     enableLoginUI();
                     google.accounts.oauth2.revoke(accessToken);
                 }
-            } catch (err) {
-                alert('เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์');
-                enableLoginUI();
-            }
+            } catch (err) { alert('เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์'); enableLoginUI(); }
         }
 
         function unlockApp(user) {
             document.getElementById('userEmailDisplay').textContent = user.email;
             if(user.picture) document.getElementById('userAvatar').src = user.picture;
             loginOverlay.classList.add('fade-out');
-            setTimeout(() => { 
-                loginOverlay.style.display = 'none'; 
-                mainApp.classList.remove('blur-sm');
-                document.body.classList.remove('overflow-hidden');
-            }, 500);
+            setTimeout(() => { loginOverlay.style.display = 'none'; mainApp.classList.remove('blur-sm'); document.body.classList.remove('overflow-hidden'); }, 500);
         }
 
-        function handleSignOut() {
-            if(accessToken) google.accounts.oauth2.revoke(accessToken);
-            location.reload();
-        }
+        function handleSignOut() { if(accessToken) google.accounts.oauth2.revoke(accessToken); location.reload(); }
 
-        // --- Search Logic ---
         document.getElementById('searchBtn').onclick = () => performSearch(true);
         document.getElementById('searchInput').onkeypress = (e) => { if(e.key === 'Enter') performSearch(true) };
         document.getElementById('fullTextToggle').addEventListener('change', (e) => {
-            document.getElementById('modeLabel').textContent = e.target.checked ? "ค้นหาเนื้อหา (Full-Text)" : "ค้นหาจากชื่อไฟล์";
-            document.getElementById('modeLabel').className = e.target.checked ? "text-sm font-bold text-blue-600 transition-colors" : "text-sm font-medium text-gray-600 transition-colors";
+            const isFull = e.target.checked;
+            document.getElementById('modeLabel').textContent = isFull ? "ค้นหาเนื้อหา (Full-Text)" : "ค้นหาจากชื่อไฟล์";
+            document.getElementById('modeLabel').className = isFull ? "text-sm font-bold text-blue-600 transition-colors" : "text-sm font-medium text-gray-600 transition-colors";
         });
 
         if(TARGET_FOLDER_ID && TARGET_FOLDER_ID.length > 5) document.getElementById('folderStatus').classList.remove('hidden');
@@ -279,37 +244,20 @@
         const pageDisplay = document.getElementById('pageDisplay');
 
         firstPageBtn.onclick = () => { pageTokenStack = [null]; currentPage = 1; performSearch(false); };
-        prevPageBtn.onclick = () => { 
-            if(currentPage > 1) {
-                const targetToken = pageTokenStack[currentPage - 2];
-                pageTokenStack = pageTokenStack.slice(0, currentPage - 1);
-                currentPage--;
-                performSearch(false, targetToken);
-            }
-        };
-        nextPageBtn.onclick = () => {
-             const nextToken = nextPageBtn.dataset.token;
-             if(nextToken) {
-                 currentPage++;
-                 pageTokenStack.push(nextToken);
-                 performSearch(false, nextToken);
-             }
-        };
+        prevPageBtn.onclick = () => { if(currentPage > 1) { const t = pageTokenStack[currentPage - 2]; pageTokenStack = pageTokenStack.slice(0, currentPage - 1); currentPage--; performSearch(false, t); }};
+        nextPageBtn.onclick = () => { const t = nextPageBtn.dataset.token; if(t) { currentPage++; pageTokenStack.push(t); performSearch(false, t); }};
 
         async function performSearch(isNewSearch, pageToken = null) {
             const query = document.getElementById('searchInput').value.trim();
             if(!query && !isNewSearch) return;
 
-            if (isNewSearch) {
-                currentPage = 1;
-                pageTokenStack = [null];
-                pageToken = null;
-            }
+            if (isNewSearch) { currentPage = 1; pageTokenStack = [null]; pageToken = null; }
 
             document.getElementById('resultsArea').classList.remove('hidden');
             const fileList = document.getElementById('fileList');
             fileList.innerHTML = '';
             document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('resultCount').textContent = 'กำลังค้นหา...';
             
             [firstPageBtn, prevPageBtn, nextPageBtn].forEach(b => b.disabled = true);
 
@@ -321,11 +269,9 @@
                 
                 let isFullText = document.getElementById('fullTextToggle').checked;
                 if(query) {
-                    if (isFullText) q += ` and fullText contains '${query}'`;
-                    else q += ` and name contains '${query}'`;
+                    q += isFullText ? ` and fullText contains '${query}'` : ` and name contains '${query}'`;
                 }
 
-                // 🔥 KEY FIX: If using fullText, DO NOT use orderBy
                 let requestParams = {
                     'pageSize': 10,
                     'fields': 'nextPageToken, files(id, name, webViewLink, thumbnailLink, createdTime, size)',
@@ -333,9 +279,9 @@
                     'pageToken': pageToken
                 };
 
-                // Only add orderBy if NOT doing a fullText search
+                // ✅ เรียงตามชื่อเฉพาะเมื่อค้นหาจากชื่อไฟล์ (ถ้า Full-Text ห้ามใส่ orderBy)
                 if (!isFullText) {
-                    requestParams['orderBy'] = 'createdTime desc';
+                    requestParams['orderBy'] = 'name';
                 }
 
                 const response = await gapi.client.drive.files.list(requestParams);
@@ -345,17 +291,16 @@
                 const nextToken = response.result.nextPageToken;
 
                 if (files && files.length > 0) {
-                    files.forEach(file => fileList.appendChild(createFileCard(file)));
+                    // แสดงจำนวนรายการในหน้านี้
+                    document.getElementById('resultCount').textContent = `พบ ${files.length} รายการ`;
                     
+                    files.forEach(file => fileList.appendChild(createFileCard(file)));
                     pageDisplay.textContent = currentPage;
                     firstPageBtn.disabled = currentPage === 1;
                     prevPageBtn.disabled = currentPage === 1;
-                    
-                    if(nextToken) {
-                        nextPageBtn.disabled = false;
-                        nextPageBtn.dataset.token = nextToken;
-                    }
+                    if(nextToken) { nextPageBtn.disabled = false; nextPageBtn.dataset.token = nextToken; }
                 } else {
+                    document.getElementById('resultCount').textContent = `0 รายการ`;
                     fileList.innerHTML = `<div class="text-center py-10 text-gray-400 bg-white border border-dashed rounded-lg"><i class="fa-regular fa-folder-open text-3xl mb-2"></i><p>ไม่พบข้อมูล</p></div>`;
                 }
             } catch (err) {
