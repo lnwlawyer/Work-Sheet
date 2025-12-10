@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เครื่องมือตรวจซ่อม API (V2)</title>
+    <title>เครื่องมือตรวจซ่อม API (V3)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
     <style> body { font-family: 'Sarabun', sans-serif; } </style>
@@ -11,23 +11,28 @@
 <body class="bg-gray-100 p-4">
 
     <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
-        <div class="bg-purple-600 p-4 text-white">
-            <h1 class="text-xl font-bold">🕵️ Diagnostics Tool V2</h1>
-            <p class="text-sm opacity-80">เจาะลึกหา Error</p>
+        <div class="bg-indigo-600 p-4 text-white">
+            <h1 class="text-xl font-bold">🛠️ Diagnostics Tool V3</h1>
+            <p class="text-sm opacity-80">แก้ปัญหา 'undefined drive'</p>
         </div>
 
         <div class="p-6 space-y-4">
             
             <div class="border-b pb-4">
-                <h3 class="font-bold text-gray-700 mb-2">1. ยืนยันตัวตน (Auth)</h3>
-                <button id="authBtn" class="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 w-full mb-2">
-                    กดเพื่อล็อกอิน
+                <h3 class="font-bold text-gray-700 mb-2">1. สถานะไลบรารี (Library)</h3>
+                <div id="libStatus" class="text-sm text-orange-500">⏳ กำลังโหลด...</div>
+            </div>
+
+            <div class="border-b pb-4">
+                <h3 class="font-bold text-gray-700 mb-2">2. ยืนยันตัวตน (Auth)</h3>
+                <button id="authBtn" class="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700 w-full mb-2" disabled>
+                    รอไลบรารี...
                 </button>
                 <div id="authStatus" class="text-sm p-2 bg-gray-50 rounded hidden"></div>
             </div>
 
             <div>
-                <h3 class="font-bold text-gray-700 mb-2">2. ทดสอบดึงข้อมูล (API Call)</h3>
+                <h3 class="font-bold text-gray-700 mb-2">3. ทดสอบดึงข้อมูล (API Call)</h3>
                 <button id="apiBtn" class="bg-gray-400 text-white px-4 py-2 rounded shadow w-full mb-2 cursor-not-allowed" disabled>
                     รอการล็อกอิน...
                 </button>
@@ -58,7 +63,6 @@
             const content = document.getElementById('logContent');
             area.classList.remove('hidden');
             
-            // Format Error Object to String
             if (typeof msg === 'object') {
                 if (msg.result && msg.result.error) {
                     msg = `Google API Error:\nCode: ${msg.result.error.code}\nMessage: ${msg.result.error.message}\nDetails: ${JSON.stringify(msg.result.error.errors, null, 2)}`;
@@ -73,38 +77,61 @@
             content.className = isError ? "text-xs font-mono p-3 bg-slate-900 text-red-400 rounded break-words whitespace-pre-wrap" : "text-xs font-mono p-3 bg-slate-900 text-green-400 rounded break-words whitespace-pre-wrap";
         }
 
+        // 1. Load Libraries (แบบ Force Load)
         function gapiLoaded() {
             gapi.load('client', async () => {
                 try {
-                    await gapi.client.init({
-                        apiKey: API_KEY,
-                        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-                    });
+                    document.getElementById('libStatus').innerHTML = '⏳ กำลัง Init GAPI...';
+                    await gapi.client.init({ apiKey: API_KEY });
+                    
+                    document.getElementById('libStatus').innerHTML = '⏳ กำลังโหลด Drive Library...';
+                    // 🔥 จุดเปลี่ยนสำคัญ: บังคับโหลด library ตรงๆ ไม่ผ่าน discoveryDocs
+                    await gapi.client.load('drive', 'v3');
+                    
+                    document.getElementById('libStatus').innerHTML = '✅ Google Drive Library โหลดเสร็จสมบูรณ์!';
+                    document.getElementById('libStatus').className = 'text-sm text-green-600 font-bold';
+                    
+                    checkEnableAuth();
                 } catch (err) {
+                    document.getElementById('libStatus').innerHTML = '❌ โหลดไม่สำเร็จ (ดูข้างล่าง)';
                     log(err, true);
                 }
             });
         }
 
         function gisLoaded() {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/drive.readonly',
-                callback: (resp) => {
-                    if (resp.error) {
-                        log(resp, true);
-                        return;
-                    }
-                    document.getElementById('authStatus').textContent = '✅ ล็อกอินสำเร็จ (Access Token ได้รับแล้ว)';
-                    document.getElementById('authStatus').classList.remove('hidden');
-                    
-                    const btn = document.getElementById('apiBtn');
-                    btn.disabled = false;
-                    btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-                    btn.classList.add('bg-green-600', 'hover:bg-green-700');
-                    btn.textContent = 'กดเพื่อดึงไฟล์ 1 ไฟล์';
-                },
-            });
+            try {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: 'https://www.googleapis.com/auth/drive.readonly',
+                    callback: (resp) => {
+                        if (resp.error) {
+                            log(resp, true);
+                            return;
+                        }
+                        document.getElementById('authStatus').textContent = '✅ ล็อกอินสำเร็จ (Access Token ได้รับแล้ว)';
+                        document.getElementById('authStatus').classList.remove('hidden');
+                        
+                        const btn = document.getElementById('apiBtn');
+                        btn.disabled = false;
+                        btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+                        btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                        btn.textContent = 'กดเพื่อดึงไฟล์ 1 ไฟล์';
+                    },
+                });
+                checkEnableAuth();
+            } catch (err) {
+                log('GIS Load Error: ' + err.message, true);
+            }
+        }
+
+        function checkEnableAuth() {
+            // ปุ่ม Login จะกดได้ก็ต่อเมื่อ Library โหลดครบทั้ง 2 ตัวแล้วเท่านั้น
+            if (gapi.client && gapi.client.drive && tokenClient) {
+                const btn = document.getElementById('authBtn');
+                btn.disabled = false;
+                btn.textContent = 'กดเพื่อล็อกอิน';
+            }
         }
 
         document.getElementById('authBtn').onclick = () => tokenClient.requestAccessToken({prompt: 'consent'});
@@ -112,13 +139,17 @@
         document.getElementById('apiBtn').onclick = async () => {
             log('กำลังส่งคำขอไปยัง Google Drive...');
             try {
+                // เช็คอีกทีว่ามีของไหม
+                if (!gapi.client.drive) {
+                    throw new Error("หา gapi.client.drive ไม่เจอ (Library ยังโหลดไม่เสร็จ)");
+                }
+
                 const response = await gapi.client.drive.files.list({
                     'pageSize': 1,
                     'fields': 'files(id, name)',
                 });
                 log(`🎉 สำเร็จ! พบไฟล์: ${response.result.files.length} รายการ\nตัวอย่าง: ${response.result.files[0]?.name || 'ไม่มีไฟล์'}`);
             } catch (err) {
-                // ตัวงัดแงะ Error อยู่ตรงนี้
                 console.error("Full Error Object:", err); 
                 log(err, true);
             }
