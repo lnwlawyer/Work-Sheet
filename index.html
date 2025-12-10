@@ -3,158 +3,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เครื่องมือตรวจซ่อม API (V4)</title>
+    <title>Diagnostics V6 (Auto-Wait)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
-    <style> body { font-family: 'Sarabun', sans-serif; } </style>
+    <style>body{font-family:sans-serif;}</style>
 </head>
-<body class="bg-gray-900 p-4 min-h-screen text-gray-200">
+<body class="bg-gray-800 p-4 min-h-screen text-white">
 
-    <div class="max-w-md mx-auto bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-700">
-        <div class="bg-red-600 p-4 text-white">
-            <h1 class="text-xl font-bold">🛠️ Diagnostics V4</h1>
-            <p class="text-sm opacity-90">ตรวจสอบการเชื่อมต่อระดับลึก</p>
+    <div class="max-w-md mx-auto bg-gray-900 rounded-xl shadow-lg border border-gray-700 overflow-hidden">
+        <div class="bg-blue-900 p-4 border-b border-blue-800">
+            <h1 class="text-xl font-bold">🛠️ V6: Auto-Wait System</h1>
+            <p class="text-xs text-blue-300">ระบบรอไลบรารีอัตโนมัติ</p>
         </div>
 
-        <div class="p-4 space-y-4">
+        <div class="p-6 space-y-6">
             
-            <!-- Console Screen -->
-            <div id="console" class="bg-black p-3 rounded font-mono text-xs h-64 overflow-y-auto border border-gray-600 space-y-1">
-                <div class="text-gray-500">--- System Start ---</div>
+            <!-- Status Monitor -->
+            <div class="space-y-3 text-sm font-mono">
+                <div class="flex justify-between items-center bg-gray-800 p-2 rounded">
+                    <span>1. GAPI (Data):</span>
+                    <span id="status-gapi" class="text-yellow-500">⏳ รอโหลด...</span>
+                </div>
+                <div class="flex justify-between items-center bg-gray-800 p-2 rounded">
+                    <span>2. GIS (Login):</span>
+                    <span id="status-gis" class="text-yellow-500">⏳ รอโหลด...</span>
+                </div>
             </div>
 
-            <!-- Manual Controls -->
-            <div class="pt-2">
-                <button id="authBtn" class="bg-blue-600 text-white px-4 py-3 rounded w-full font-bold opacity-50 cursor-not-allowed" disabled>
-                    รอโหลดระบบ...
+            <!-- Controls -->
+            <div class="space-y-3">
+                <!-- ปุ่มนี้จะทำงานเองเมื่อพร้อม -->
+                <button id="btn-login" onclick="doLogin()" class="w-full bg-gray-600 text-gray-400 py-3 rounded-lg font-bold cursor-not-allowed transition-all" disabled>
+                    🚫 รอระบบ Google...
                 </button>
+
+                <button id="btn-test" onclick="doTest()" class="w-full bg-gray-700 text-gray-500 py-3 rounded-lg font-bold cursor-not-allowed transition-all" disabled>
+                    📂 ทดสอบดึงข้อมูล
+                </button>
+            </div>
+
+            <!-- Console -->
+            <div class="bg-black text-green-400 p-3 rounded text-xs font-mono h-48 overflow-y-auto border border-gray-700" id="console">
+                > System Started...<br>
+                > Waiting for Google Libraries...
             </div>
 
         </div>
     </div>
 
-    <!-- Script Loaders with Error Traps -->
-    <script src="https://apis.google.com/js/api.js" 
-            onload="log('✅ Google API Script (gapi) loaded', 'success'); gapiLoaded();" 
-            onerror="log('❌ Google API Script (gapi) FAILED to load! เช็คเน็ตหรือ Firewall', 'error')">
-    </script>
-    
-    <script src="https://accounts.google.com/gsi/client" 
-            onload="log('✅ Google Identity Script (gis) loaded', 'success'); gisLoaded();" 
-            onerror="log('❌ Google Identity Script (gis) FAILED to load!', 'error')">
-    </script>
+    <!-- Scripts -->
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <script>
-        // ==========================================
         const CLIENT_ID = '395031237674-6j28i27or4lk6t3m342srbefukr1fp1d.apps.googleusercontent.com';
         const API_KEY = 'AIzaSyANFH1JUJ8Y29ImxTYwBdSV6V7-xWfHd90'; 
-        // ==========================================
 
         let tokenClient;
-        let isGapiReady = false;
-        let isGisReady = false;
+        let gapiReady = false;
+        let gisReady = false;
 
-        function log(msg, type = 'info') {
-            const consoleDiv = document.getElementById('console');
-            const colorClass = type === 'error' ? 'text-red-400 font-bold' : (type === 'success' ? 'text-green-400' : 'text-gray-300');
-            
-            // Format Object
-            if (typeof msg === 'object') msg = JSON.stringify(msg, null, 2);
-            
-            consoleDiv.innerHTML += `<div class="${colorClass}">> ${msg}</div>`;
-            consoleDiv.scrollTop = consoleDiv.scrollHeight; // Auto scroll
+        function log(msg, type='info') {
+            const c = document.getElementById('console');
+            const color = type === 'error' ? 'text-red-400' : 'text-green-400';
+            c.innerHTML += `<div class="${color}">> ${msg}</div>`;
+            c.scrollTop = c.scrollHeight;
         }
 
-        function checkReady() {
-            if(isGapiReady && isGisReady) {
-                const btn = document.getElementById('authBtn');
-                btn.disabled = false;
-                btn.classList.remove('opacity-50', 'cursor-not-allowed');
-                btn.classList.add('hover:bg-blue-700');
-                btn.innerText = 'กดเพื่อเริ่มทดสอบ (Start)';
-                log('🚀 ระบบพร้อมแล้ว! กดปุ่มด้านล่างได้เลย', 'success');
+        function setStatus(id, text, type) {
+            const el = document.getElementById(id);
+            el.innerHTML = text;
+            el.className = type === 'success' ? 'text-green-400 font-bold' : 'text-red-400 font-bold';
+        }
+
+        // --- CORE: Auto Check Loop ---
+        // เช็คทุกๆ 0.5 วินาที ว่า Google มาหรือยัง
+        const checkInterval = setInterval(() => {
+            
+            // 1. Check GAPI
+            if(!gapiReady && typeof gapi !== 'undefined') {
+                log('GAPI Script found. Initializing...');
+                gapiReady = true;
+                initGapi();
             }
-        }
 
-        // 1. Initialize GAPI
-        function gapiLoaded() {
+            // 2. Check GIS (ตัวที่มีปัญหา)
+            if(!gisReady && typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                log('GIS Script found. Initializing...');
+                gisReady = true;
+                initGis();
+            }
+
+            // 3. Enable Button when both ready
+            if(gapiReady && gisReady) {
+                clearInterval(checkInterval); // หยุดเช็ค
+                log('🚀 SYSTEM READY! กดปุ่มล็อกอินได้เลย');
+                const btn = document.getElementById('btn-login');
+                btn.disabled = false;
+                btn.className = 'w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-500 shadow-lg cursor-pointer';
+                btn.innerText = '🔐 กดเพื่อล็อกอิน (Login)';
+            }
+
+        }, 500);
+
+        // Init GAPI
+        function initGapi() {
             gapi.load('client', async () => {
-                log('กำลัง Initialize GAPI Client...');
                 try {
                     await gapi.client.init({
                         apiKey: API_KEY,
                         discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
                     });
-                    
-                    // Double Check
-                    if (gapi.client.drive) {
-                        log('✅ GAPI Init Success: Drive API พร้อมใช้งาน', 'success');
-                        isGapiReady = true;
-                        checkReady();
-                    } else {
-                        throw new Error("Init ผ่าน แต่หา Drive API ไม่เจอ");
-                    }
-
-                } catch (err) {
-                    log('❌ GAPI Init Error (จุดสำคัญ):', 'error');
-                    
-                    if (err.result && err.result.error) {
-                        log(`Code: ${err.result.error.code}`);
-                        log(`Message: ${err.result.error.message}`);
-                        if(err.result.error.code === 403) log('👉 สาเหตุ: API Key อาจถูกบล็อก (Restrict) หรือยังไม่เปิด Drive API');
-                    } else {
-                        log(err);
-                    }
+                    setStatus('status-gapi', '✅ พร้อมใช้งาน', 'success');
+                    log('GAPI Client Initialized');
+                } catch(e) {
+                    setStatus('status-gapi', '❌ Error', 'error');
+                    log('GAPI Init Error: ' + JSON.stringify(e), 'error');
                 }
             });
         }
 
-        // 2. Initialize GIS
-        function gisLoaded() {
+        // Init GIS
+        function initGis() {
             try {
                 tokenClient = google.accounts.oauth2.initTokenClient({
                     client_id: CLIENT_ID,
                     scope: 'https://www.googleapis.com/auth/drive.readonly',
-                    callback: async (resp) => {
-                        if (resp.error) {
-                            log('❌ Login Error: ' + JSON.stringify(resp), 'error');
+                    callback: (resp) => {
+                        if(resp.error) {
+                            log('Auth Error: ' + JSON.stringify(resp), 'error');
                             return;
                         }
-                        log('✅ Login Success! Token ได้รับแล้ว', 'success');
-                        
-                        // Auto Trigger Test
-                        testApiCall();
+                        log('✅ Access Token Received!');
+                        enableTestBtn();
                     },
                 });
-                isGisReady = true;
-                checkReady();
-            } catch (err) {
-                log('❌ GIS Init Error: ' + err.message, 'error');
+                setStatus('status-gis', '✅ พร้อมใช้งาน', 'success');
+                log('GIS Client Initialized');
+            } catch(e) {
+                setStatus('status-gis', '❌ Init Failed', 'error');
+                log('GIS Init Error: ' + e.message, 'error');
             }
         }
 
-        // 3. User Click Action
-        document.getElementById('authBtn').onclick = () => {
-            log('กำลังขอสิทธิ์เข้าถึง (Requesting Token)...');
+        function enableTestBtn() {
+            const btn = document.getElementById('btn-test');
+            btn.disabled = false;
+            btn.className = 'w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-500 shadow-lg cursor-pointer';
+            btn.innerText = '📂 3. กดทดสอบดึงข้อมูล';
+        }
+
+        function doLogin() {
+            if(!tokenClient) { log('Client not ready yet...', 'error'); return; }
             tokenClient.requestAccessToken({prompt: 'consent'});
-        };
+        }
 
-        // 4. Final API Test
-        async function testApiCall() {
-            log('⚡ กำลังทดสอบดึงข้อมูลจริง...');
+        async function doTest() {
+            log('Testing API Call...');
             try {
-                const response = await gapi.client.drive.files.list({
+                const res = await gapi.client.drive.files.list({
                     'pageSize': 1,
-                    'fields': 'files(id, name)',
+                    'fields': 'files(id, name)'
                 });
-                log('🎉🎉 ไชโย! ระบบทำงานสมบูรณ์แล้ว 🎉🎉', 'success');
-                log(`พบไฟล์ตัวอย่าง: ${response.result.files[0]?.name || 'ไม่พบไฟล์ (แต่ระบบปกติ)'}`);
-                
-                alert("ยินดีด้วย! ระบบใช้งานได้แล้ว คุณสามารถกลับไปใช้โค้ดจริง (ไฟล์เดิม) ได้เลย");
-
-            } catch (err) {
-                log('❌ API Call Error (ดึงข้อมูลไม่ได้):', 'error');
-                log(err);
+                log(`🎉 SUCCESS! Found ${res.result.files.length} files`, 'success');
+                if(res.result.files.length > 0) log('File: ' + res.result.files[0].name);
+                alert("สำเร็จ! ระบบใช้งานได้แล้วครับ");
+            } catch(e) {
+                log('API Error: ' + JSON.stringify(e), 'error');
             }
         }
     </script>
