@@ -2,14 +2,58 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ระบบค้นหา Work Sheet</title>
+    
+    <!-- PWA Settings & Mobile Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2563EB">
+    <meta name="application-name" content="Work Sheet">
+    <meta name="apple-mobile-web-app-title" content="Work Sheet">
+
+    <!-- App Icons -->
+    <link rel="icon" type="image/jpeg" href="https://live.staticflickr.com/65535/54717708911_c7c0b93bfa_w.jpg">
+    <link rel="apple-touch-icon" href="https://live.staticflickr.com/65535/54717708911_c7c0b93bfa_w.jpg">
+
+    <!-- Embedded Web App Manifest (Data URI) -->
+    <link rel="manifest" id="my-manifest-placeholder">
+    <script>
+        // Generate Manifest dynamically to support PWA install without external file
+        const manifestData = {
+            "name": "ระบบค้นหา Work Sheet",
+            "short_name": "Work Sheet",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#ffffff",
+            "theme_color": "#2563EB",
+            "orientation": "portrait",
+            "icons": [
+                {
+                    "src": "https://live.staticflickr.com/65535/54717708911_c7c0b93bfa_w.jpg",
+                    "sizes": "192x192",
+                    "type": "image/jpeg"
+                },
+                {
+                    "src": "https://live.staticflickr.com/65535/54717708911_c7c0b93bfa_w.jpg",
+                    "sizes": "512x512",
+                    "type": "image/jpeg"
+                }
+            ]
+        };
+        const stringManifest = JSON.stringify(manifestData);
+        const blob = new Blob([stringManifest], {type: 'application/json'});
+        const manifestURL = URL.createObjectURL(blob);
+        document.querySelector('#my-manifest-placeholder').setAttribute('href', manifestURL);
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
     
     <style>
-        body { font-family: 'Prompt', sans-serif; }
+        body { font-family: 'Prompt', sans-serif; overscroll-behavior-y: none; }
         .glass-panel {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(12px);
@@ -19,17 +63,21 @@
         .toggle-checkbox:checked { right: 0; border-color: #2563EB; }
         .toggle-checkbox:checked + .toggle-label { background-color: #2563EB; }
         .fade-out { opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
+        
+        /* Disable text selection for app-like feel */
+        .no-select { -webkit-user-select: none; user-select: none; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] flex flex-col overflow-hidden">
+<body class="bg-slate-50 min-h-screen text-slate-800 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] flex flex-col overflow-hidden no-select">
 
     <!-- 🔒 LOGIN OVERLAY -->
     <div id="loginOverlay" class="fixed inset-0 z-[100] bg-slate-900/95 flex flex-col items-center justify-center text-white transition-opacity duration-500 backdrop-blur-sm">
         <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072&auto=format&fit=crop')] bg-cover bg-center opacity-10"></div>
         <div class="relative z-10 text-center p-8 max-w-md w-full">
             <div class="bg-white/10 backdrop-blur-md p-8 rounded-3xl border border-white/20 shadow-2xl">
-                <div class="mb-6 bg-blue-600 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-blue-600/30">
-                    <i class="fa-solid fa-folder-tree text-4xl text-white"></i>
+                <!-- App Icon Display -->
+                <div class="mb-6 w-24 h-24 rounded-2xl mx-auto shadow-lg overflow-hidden border-4 border-white/30">
+                    <img src="https://live.staticflickr.com/65535/54717708911_c7c0b93bfa_w.jpg" class="w-full h-full object-cover">
                 </div>
                 <h1 class="text-2xl font-bold mb-2">ระบบค้นหา Work Sheet</h1>
                 <p class="text-gray-300 mb-8 text-sm">สำนักมาตรฐานการทะเบียนที่ดิน</p>
@@ -46,22 +94,27 @@
                 </div>
 
                 <p class="mt-6 text-xs text-gray-500">Authorized Personnel Only</p>
+                
+                <!-- Install Button (Hidden by default, shown via JS) -->
+                <button id="installAppBtn" class="hidden mt-4 text-xs bg-white/20 hover:bg-white/30 px-4 py-2 rounded-full transition-colors flex items-center justify-center mx-auto text-white">
+                    <i class="fa-solid fa-download mr-2"></i> ติดตั้งแอปพลิเคชัน
+                </button>
             </div>
         </div>
     </div>
 
     <!-- 🔓 MAIN APP -->
     <div id="mainApp" class="flex flex-col min-h-screen w-full filter blur-sm transition-all duration-500">
-        <nav class="bg-white/90 backdrop-blur shadow-sm sticky top-0 z-50 border-b border-gray-100">
+        <nav class="bg-white/90 backdrop-blur shadow-sm sticky top-0 z-50 border-b border-gray-100 pt-safe-top">
             <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
                     <div class="flex items-center">
-                        <div class="bg-gradient-to-tr from-blue-600 to-indigo-600 text-white w-10 h-10 rounded-lg flex items-center justify-center mr-3 shadow-lg shadow-blue-500/30">
-                            <i class="fa-solid fa-cloud-magnifying-glass"></i>
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center mr-3 shadow-lg overflow-hidden border border-gray-100">
+                            <img src="https://live.staticflickr.com/65535/54717708911_c7c0b93bfa_w.jpg" class="w-full h-full object-cover">
                         </div>
                         <div>
-                            <h1 class="text-xl font-bold text-gray-800 tracking-tight">ระบบค้นหา Work Sheet</h1>
-                            <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wider">สำนักมาตรฐานการทะเบียนที่ดิน</p>
+                            <h1 class="text-lg font-bold text-gray-800 tracking-tight">Work Sheet Search</h1>
+                            <p class="text-[10px] text-gray-400 font-medium uppercase tracking-wider">ระบบค้นหาเอกสาร</p>
                         </div>
                     </div>
                     <div class="flex items-center space-x-3">
@@ -69,7 +122,7 @@
                             <div id="userEmailDisplay" class="text-sm font-semibold text-gray-700">Checking...</div>
                             <div class="text-xs text-green-500"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Online</div>
                         </div>
-                        <div class="h-10 w-10 rounded-full bg-gray-200 border-2 border-white shadow-sm overflow-hidden relative">
+                        <div class="h-9 w-9 rounded-full bg-gray-200 border-2 border-white shadow-sm overflow-hidden relative">
                             <img id="userAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Admin" alt="User">
                         </div>
                         <button onclick="handleSignOut()" class="text-gray-400 hover:text-red-500 ml-2" title="Sign Out"><i class="fa-solid fa-right-from-bracket"></i></button>
@@ -78,8 +131,8 @@
             </div>
         </nav>
 
-        <main class="max-w-5xl mx-auto px-4 py-10 w-full flex-grow pb-24">
-            <div class="bg-white rounded-3xl shadow-xl p-8 mb-8 glass-panel">
+        <main class="max-w-5xl mx-auto px-4 py-6 w-full flex-grow pb-24">
+            <div class="bg-white rounded-3xl shadow-xl p-6 md:p-8 mb-6 glass-panel">
                 <div class="relative max-w-2xl mx-auto group">
                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                         <i class="fa-solid fa-magnifying-glass text-gray-400 text-lg group-focus-within:text-blue-500 transition-colors"></i>
@@ -126,7 +179,7 @@
         </main>
     </div>
 
-    <footer class="bg-white/90 backdrop-blur border-t border-gray-200 fixed bottom-0 w-full z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+    <footer class="bg-white/90 backdrop-blur border-t border-gray-200 fixed bottom-0 w-full z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] pb-safe-bottom">
         <div class="max-w-6xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
             <div class="flex flex-col md:flex-row justify-between items-center text-xs text-gray-500">
                 <div class="mb-1 md:mb-0 font-medium">&copy; <script>document.write(new Date().getFullYear())</script> All Rights Reserved.</div>
@@ -160,12 +213,33 @@
 
         let gapiReady = false;
         let gisReady = false;
+        let deferredPrompt; // For install prompt
 
         const loginBtn = document.getElementById('loginBtn');
         const btnText = document.getElementById('btnText');
         const loginOverlay = document.getElementById('loginOverlay');
         const mainApp = document.getElementById('mainApp');
         
+        // PWA Install Prompt Logic
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const installBtn = document.getElementById('installAppBtn');
+            if(installBtn) {
+                installBtn.classList.remove('hidden');
+                installBtn.addEventListener('click', () => {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('User accepted the install prompt');
+                        }
+                        deferredPrompt = null;
+                        installBtn.classList.add('hidden');
+                    });
+                });
+            }
+        });
+
         setTimeout(() => {
             if (!gapiReady || !gisReady) {
                 document.getElementById('manualLoad').classList.remove('hidden');
